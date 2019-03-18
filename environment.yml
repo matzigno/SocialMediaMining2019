@@ -4,3 +4,4 @@ dependencies:
   - requests
   - beautifulsoup4
   - Pillow
+  - twitter
