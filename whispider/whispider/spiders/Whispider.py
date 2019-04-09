@@ -1,6 +1,7 @@
 import scrapy
 from bs4 import BeautifulSoup as bs
 from whispider.items import LinkItem
+from urllib import parse
 
 class WhiSpider(scrapy.Spider):
 
@@ -23,11 +24,30 @@ class WhiSpider(scrapy.Spider):
     def check_login(self, response):
         if response.text.find('somenilab') != -1:
             yield scrapy.Request('https://weheartit.com/pekmarifetli/contacts', callback = self.parse_friends)
+            yield scrapy.Request('https://weheartit.com/pekmarifetli/fans', callback = self.parse_fans)
 
     def parse_friends(self, response):
-        source = response.url.split('/')[-2]
-        xpath_selection = "//div[contains(@class,'js-user-info')]//a[contains(@class,'avatar-container')]/@href"
-        for e in response.selector.xpath(xpath_selection).getall():
+        source = response.url.split('/')[3]
+        xpath_selection_maxpage = "//div[@id='content']/@data-infinite-scroll-count"
+        if not parse.parse_qs(parse.urlsplit(response.url).query):
+            if response.selector.xpath(xpath_selection_maxpage).get():
+                for i in range(2,min(10, int(response.selector.xpath(xpath_selection_maxpage).get()))):
+                    yield scrapy.Request('https://weheartit.com/{}/contacts?scrolling=true&page={}'.format(source,i), callback=self.parse_friends)
+        xpath_selection_friends = "//div[contains(@class,'js-user-info')]//a[contains(@class,'avatar-container')]/@href"
+        for e in response.selector.xpath(xpath_selection_friends).getall():
             #yield {'source': source , 'destination': e[1:]}
             yield LinkItem(source = source, destination = e[1:])
             yield scrapy.Request('https://weheartit.com{}/contacts'.format(e), callback=self.parse_friends)
+
+    def parse_fans(self, response):
+        source = response.url.split('/')[3]
+        xpath_selection_maxpage = "//div[@id='content']/@data-infinite-scroll-count"
+        if not parse.parse_qs(parse.urlsplit(response.url).query):
+            if response.selector.xpath(xpath_selection_maxpage).get():
+                for i in range(2,min(10, int(response.selector.xpath(xpath_selection_maxpage).get()))):
+                    yield scrapy.Request('https://weheartit.com/{}/fans?scrolling=true&page={}'.format(source,i), callback=self.parse_fans)
+        xpath_selection_friends = "//div[contains(@class,'js-user-info')]//a[contains(@class,'avatar-container')]/@href"
+        for e in response.selector.xpath(xpath_selection_friends).getall():
+            #yield {'source': e[1:] , 'destination': source}
+            yield LinkItem(source = e[1:], destination = source)
+            yield scrapy.Request('https://weheartit.com{}/fans'.format(e), callback=self.parse_friends)
